@@ -26,6 +26,17 @@ Por meio deste estudo, buscamos desenvolver um modelo de regressão que possa pr
 
 # Análise dos Dados
 
+Neste trabalho estamos utilizando a base de dados "pesca", na qual foi adicionada a informação se houve ou não os fenômenos naturais *El Niño* ou *La Niña*, obtida a partir das variações de temperatura informadas pelo Climate Prediction Center do National Weather Service. A seguir descrevemos as variáveis utilizadas para as análises:
+
+
++ frota: frota da pesca, podendo ser Santos ou Ubatuba
++ ano: ano da pesca, que abrange os anos de 1995 a 1999
++ trimestre: em que trimestre do ano ocorreu a pesca
++ latitude: latitude em que ocorreu a pesca
++ longitude: longitude em que ocorreu a pesca
++ fenomeno: qual fenômeno natural ocorreu, podendo ser "nino", "nina" ou "neutro" nos casos de *El Niño*, *La Niña* ou não ocorrência de nenhum dos dois, respectivamente
++ cpue: captura por unidade de pesca, ou seja, quantidade de peixes batata capturados em kg, dividida pelo número de dias de pesca
+
 ```{r, echo=F, warning=FALSE, message=FALSE}
 library("GGally") 
 library("MASS")		    # stepwise (aic)
@@ -77,10 +88,31 @@ dados2 <- left_join(pesca, dados, by = c("ano", "trimestre")) |>
     ) |>
   select(-c(dias_pesca, captura))
 
-summary(dados2)
-
 
 ```
+
+Para melhor compreensão das variáveis a serem analisadas, vamos observar algumas de suas medidas descritivas:
+
+```{r, echo=F}
+library(knitr)
+library(summarytools)
+
+st_options(
+  plain.ascii = FALSE, 
+  style = "rmarkdown",
+  dfSummary.style = "grid",
+  dfSummary.valid.col = FALSE,
+  dfSummary.graph.magnif = .52,
+  subtitle.emphasis = FALSE,
+  tmp.img.dir = "/tmp"
+)
+# summary(dados2)
+# kable(summary(dados2 |> select(-c(frota, fenomeno))))
+dfSummary(dados2)
+```
+
+Também é importante verificar como a variável que vai ser modelada se distribui. Originalmente, temos a variável `cpue`, captura por unidade de esforço. Porém, como observado abaixo, essa variável apresenta uma assimetria à direita, assim usamos a Transformação de Box-cox com $\lambda = 0$ para tornar os dados mais simétricos e semelhantes à distribuição normal. Abaixo podemos observar a diferença na distribuição da variável `cpue` (variável original) e `cpue2`, (variável com Transformação de Box-Cox).
+
 
 ```{r, warning=FALSE, message=FALSE}
 ggplot(dados2, aes(x = cpue)) +
@@ -91,7 +123,23 @@ ggplot(dados2, aes(x = cpue)) +
     y = "Densidade"
   ) + theme_minimal() + 
   geom_vline(xintercept = mean(dados2$cpue), linetype = "dashed", color = "black")
+
 ```
+
+```{r, echo=F}
+
+ggplot(dados2, aes(x = cpue2)) +
+  geom_density(alpha = 0.5, fill = "violet", col = "violet") +  
+  labs(
+    #title = "Histograma de Densidade",
+    x = "Captura por unidade de pesca com Transformação de Box-Cox",
+    y = "Densidade"
+  ) + theme_minimal() + 
+  geom_vline(xintercept = mean(dados2$cpue2), linetype = "dashed", color = "black")
+
+```
+
+A seguir vamos analisar como o comportamento da variável `cpue`é influenciada por outras variáveis.
 
 ```{r, warning=FALSE, message=FALSE}
 ggplot(dados2, aes(x = fenomeno, y = cpue, fill = fenomeno)) +
@@ -99,11 +147,14 @@ ggplot(dados2, aes(x = fenomeno, y = cpue, fill = fenomeno)) +
   labs(
    # title = " ",
     x = "Fenômeno natural",
-    y = "Captura por unidade de esforço"
+    y = "Captura por unidade de esforço",
+    fill = "Fenômeno natural"
   ) + scale_x_discrete(labels = c("Nenhum", "La Niña", "El Niño")) +
-  theme_minimal()
+  theme_minimal() + scale_fill_discrete(labels=c("Nenhum", "La Niña", "El Niño"))
 
 ```
+
+No gráfico acima podemos observar os efeitos dos fenômenos naturais *El Niño* e *La Niña* na captura de peixes por unidade de esforço. Notamos que durante o fenômeno *La Niña*, caracterizado pelo resfriamento das águas do Pacífico, causa uma significativa diminuição na captura, apresentando menor mediana e variabilidade nessa variável. Já o *El Niño*, que provova um aumento na temperatura das águas do pacífico, gera um leve aumento na captura quando comparado à ausência de fenômenos naturais, com variabilidade um pouco maior.
 
 ```{r, warning=FALSE, message=FALSE}
 ggplot(dados2, aes(x = cpue, fill = as.factor(ano))) +
@@ -115,6 +166,9 @@ ggplot(dados2, aes(x = cpue, fill = as.factor(ano))) +
     fill = 'Ano'
   ) + theme_minimal()
 ```
+
+Nesse caso, estamos analisando como a captura por unidade de esforço se distribui por ano. Observamos que em 1995 essa variável se distribuía de forma mais homogênea, enquanto nos anos seguintes houve grande concentração em torno de 200 kg de peixe por dia de pesca. 
+
 
 ```{r, warning=FALSE, message=FALSE}
 ggplot(dados2, aes(x = cpue, fill = frota)) +
@@ -136,7 +190,7 @@ ggplot(dados2, aes(x = trimestre, y = cpue, fill = as.factor(trimestre))) +
     y = "Captura por unidade de esforço",
     fill = "Trimestre"
   ) + 
-  theme_minimal()
+  theme_minimal() 
 ```
 
 ```{r, warning=FALSE, message=FALSE}

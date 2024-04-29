@@ -1,0 +1,181 @@
+---
+title: "Análise de Regressão"
+author: "Mariana Costa Freitas"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Introdução
+
+A atividade pesqueira desempenha um papel crucial na economia global, fornecendo alimento, sustento e meios de subsistência para milhões de pessoas em todo o mundo. No entanto, a produtividade das pescarias é fortemente influenciada por uma série de fatores complexos, que vão desde condições ambientais até fenômenos climáticos globais.
+
+Este estudo se concentra na análise da relação entre a captura por unidade de esforço (CPUE) e uma variedade de variáveis que afetam a atividade pesqueira. A CPUE, um indicador fundamental da eficácia da pesca, representa a quantidade de peixes capturados por unidade de esforço de pesca, como o número de anzóis ou a quantidade de redes utilizadas.
+
+Entre os fatores considerados, estão a frota de pesca, o ano e trimestre da pesca, as coordenadas geográficas (longitude e latitude) e a presença dos fenômenos climáticos El Niño e La Niña durante o período de pesca.
+
+A frota de pesca pode variar em tamanho, capacidade tecnológica e métodos de pesca, influenciando diretamente na eficiência da captura. O ano e trimestre da pesca refletem possíveis tendências temporais na atividade pesqueira, enquanto as coordenadas geográficas indicam a localização específica das operações de pesca, levando em conta a influência das características do habitat marinho.
+
+Além disso, os fenômenos climáticos El Niño e La Niña exercem um impacto significativo nas condições oceânicas e atmosféricas, afetando a distribuição e abundância de espécies marinhas. A relação entre esses fenômenos e a captura de peixes é complexa e multifacetada, envolvendo alterações na temperatura da água, padrões de correntes oceânicas e disponibilidade de alimento para os peixes.
+
+Para entender melhor como esses diversos fatores influenciam a captura por unidade de esforço, recorremos à análise de regressão estatística. A análise de regressão permite identificar e quantificar as relações entre uma variável dependente (no nosso caso, a CPUE) e uma ou mais variáveis independentes (frota, ano, trimestre, coordenadas geográficas, El Niño e La Niña).
+
+Por meio deste estudo, buscamos desenvolver um modelo de regressão que possa prever a captura por unidade de esforço com base nessas variáveis, fornecendo insights valiosos para a gestão sustentável e eficaz dos recursos pesqueiros em um contexto dinâmico e em constante mudança.
+
+# Análise dos Dados
+
+```{r, echo=F, warning=FALSE, message=FALSE}
+library("GGally") 
+library("MASS")		    # stepwise (aic)
+library("mixlm")		  # stepwise (valor-p)
+#library("glmulti")	  # todas as regressoes
+library("tidyverse")
+library("rvest")
+library("reshape2")
+library("dplyr")
+library("ggplot2")
+
+# Importando os dados a serem utilizados
+url <- "https://origin.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ONI_v5.php"
+html <- read_html(url)
+tabelas <- html |> html_nodes("table")
+
+tabela_desejada <- tabelas[[9]]
+
+dados <- tabela_desejada|> 
+  html_table(header=T) |>
+  filter(Year !="Year" & Year != 2024)
+
+dados <-  pivot_longer(data = dados, cols = colnames(dados)[2:ncol(dados)],
+               names_to = "meses") |>
+  filter(meses %in% c("JFM", "AMJ", "JAS", "OND"))
+
+dados <- dados |>
+  summarise(
+    ano = as.numeric(Year),
+    trimestre = case_when(
+    meses == "JFM" ~ 1,
+    meses == "AMJ" ~ 2,
+    meses == "JAS" ~ 3,
+    meses == "OND" ~ 4
+  ),
+  
+  fenomeno = case_when(
+    value >= 0.5 ~ "nino",
+    value <= -0.5 ~ "nina",
+    TRUE ~ "neutro"
+  )
+  )
+
+pesca <- read.delim("~/Analise_de_regressao/Trabalho_el_nino/pesca.txt")
+
+dados2 <- left_join(pesca, dados, by = c("ano", "trimestre")) |>
+  mutate(
+    cpue2 = log(cpue)
+    ) |>
+  select(-c(dias_pesca, captura))
+
+summary(dados2)
+
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(dados2, aes(x = cpue)) +
+  geom_density(alpha = 0.5, fill = "violet", col = "violet") +  
+  labs(
+    #title = "Histograma de Densidade",
+    x = "Captura por unidade de pesca",
+    y = "Densidade"
+  ) + theme_minimal() + 
+  geom_vline(xintercept = mean(dados2$cpue), linetype = "dashed", color = "black")
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(dados2, aes(x = fenomeno, y = cpue, fill = fenomeno)) +
+  geom_boxplot() +
+  labs(
+   # title = " ",
+    x = "Fenômeno natural",
+    y = "Captura por unidade de esforço"
+  ) + scale_x_discrete(labels = c("Nenhum", "La Niña", "El Niño")) +
+  theme_minimal()
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(dados2, aes(x = cpue, fill = as.factor(ano))) +
+  geom_density(alpha = 0.3) +
+  labs(
+    title = " ",
+    x = "Captura por unidade de esforço",
+    y = "Densidade",
+    fill = 'Ano'
+  ) + theme_minimal()
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(dados2, aes(x = cpue, fill = frota)) +
+  geom_density(alpha = 0.3) +
+  labs(
+    title = " ",
+    x = "Captura por unidade de esforço",
+    y = "Densidade",
+    fill = 'Frota'
+  ) + theme_minimal() 
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(dados2, aes(x = trimestre, y = cpue, fill = as.factor(trimestre))) +
+  geom_boxplot() +
+  labs(
+    # title = " ",
+    x = "Trimestre",
+    y = "Captura por unidade de esforço",
+    fill = "Trimestre"
+  ) + 
+  theme_minimal()
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggcorr(select(dados2, -c(cpue2)), geom = "blank", label = TRUE, hjust = 0.75) +
+  geom_point(size = 10, aes(color = coefficient >= 0, alpha = abs(coefficient) >= 0.05)) +
+  scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
+  guides(color = FALSE, alpha = FALSE)
+```
+
+```{r, warning=FALSE, message=FALSE}
+dados2 <- dados2 |> select(-c(cpue))
+
+modelo <- stats::lm(cpue2 ~ ., data=dados2)
+summary(modelo)
+
+opt_model_step_aic<- stepAIC(modelo, direction="both") 
+summary(opt_model_step_aic)
+```
+
+# Conclusão
+
+Neste estudo, exploramos a relação entre a captura por unidade de esforço (CPUE) e uma série de variáveis que influenciam a atividade pesqueira, incluindo frota, latitude, longitude e a presença dos fenômenos climáticos El Niño e La Niña. Utilizando análise de regressão estatística, desenvolvemos um modelo que incorpora essas variáveis e busca prever a CPUE de maneira precisa e robusta.
+
+Os resultados obtidos demonstram que a frota de pesca desempenha um papel significativo na determinação da captura por unidade de esforço, refletindo as diferenças nas capacidades técnicas, métodos de pesca e estratégias de operação entre as embarcações. Além disso, as coordenadas geográficas (latitude e longitude) mostraram-se importantes para capturar variações na distribuição e abundância de recursos pesqueiros em diferentes regiões.
+
+A inclusão dos fenômenos El Niño e La Niña no modelo revelou sua relevância na explicação da variação na CPUE. Esses eventos climáticos globais influenciam diretamente as condições oceânicas e atmosféricas, afetando a disponibilidade de alimento, padrões de migração e comportamento dos peixes, e, consequentemente, a eficiência da pesca.
+
+Ao adotar um modelo que considera esses fatores inter-relacionados, somos capazes de melhorar nossa compreensão das complexas dinâmicas da atividade pesqueira e, por conseguinte, auxiliar na formulação de estratégias de manejo mais eficazes e sustentáveis. Tal abordagem não apenas permite uma exploração mais precisa dos recursos pesqueiros, mas também contribui para a conservação dos ecossistemas marinhos e para o bem-estar das comunidades que dependem da pesca para subsistência e sustento econômico.
+
+No entanto, é importante ressaltar que qualquer modelo de previsão está sujeito a limitações e incertezas inerentes à complexidade dos sistemas naturais. Portanto, recomenda-se a continuidade da pesquisa e monitoramento contínuo das condições pesqueiras, a fim de adaptar e aprimorar as estratégias de manejo conforme necessário, garantindo a saúde e a resiliência dos ecossistemas marinhos e das comunidades dependentes da pesca.
+
+
+
+
+
+
+
+
+
+
+
+

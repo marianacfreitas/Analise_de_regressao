@@ -6,13 +6,14 @@ output:
   pdf_document: default
   html_document:
     df_print: paged
+  word_document: default
 ---
 
 # Introdução
 
 A atividade pesqueira desempenha um papel crucial na economia global, fornecendo alimento, sustento e meios de subsistência para milhões de pessoas em todo o mundo. No entanto, a produtividade das pescarias é fortemente influenciada por uma série de fatores complexos, que vão desde condições ambientais até fenômenos climáticos globais.
 
-Este estudo se concentra na análise da relação entre a captura por unidade de esforço (CPUE) e uma variedade de variáveis que afetam a atividade pesqueira. A CPUE, um indicador fundamental da eficácia da pesca, representa a quantidade de peixes capturados por unidade de esforço de pesca, como o número de anzóis ou a quantidade de redes utilizadas.
+Este estudo se concentra na análise da relação entre a captura por unidade de esforço (CPUE) e uma variedade de variáveis que afetam a atividade pesqueira. A CPUE, um indicador fundamental da eficácia da pesca, representa a quantidade de peixes capturados por unidade de esforço de pesca, como o número de dias de pesca.
 
 Entre os fatores considerados, estão a frota de pesca, o ano e trimestre da pesca, as coordenadas geográficas (longitude e latitude) e a presença dos fenômenos climáticos El Niño e La Niña durante o período de pesca.
 
@@ -21,8 +22,6 @@ A frota de pesca pode variar em tamanho, capacidade tecnológica e métodos de p
 Além disso, os fenômenos climáticos El Niño e La Niña exercem um impacto significativo nas condições oceânicas e atmosféricas, afetando a distribuição e abundância de espécies marinhas. A relação entre esses fenômenos e a captura de peixes é complexa e multifacetada, envolvendo alterações na temperatura da água, padrões de correntes oceânicas e disponibilidade de alimento para os peixes.
 
 Para entender melhor como esses diversos fatores influenciam a captura por unidade de esforço, recorremos à análise de regressão estatística. A análise de regressão permite identificar e quantificar as relações entre uma variável dependente (no nosso caso, a CPUE) e uma ou mais variáveis independentes (frota, ano, trimestre, coordenadas geográficas, El Niño e La Niña).
-
-Por meio deste estudo, buscamos desenvolver um modelo de regressão que possa prever a captura por unidade de esforço com base nessas variáveis, fornecendo insights valiosos para a gestão sustentável e eficaz dos recursos pesqueiros em um contexto dinâmico e em constante mudança.
 
 # Análise dos Dados
 
@@ -36,6 +35,8 @@ Neste trabalho estamos utilizando a base de dados "pesca", na qual foi adicionad
 + longitude: longitude em que ocorreu a pesca
 + fenomeno: qual fenômeno natural ocorreu, podendo ser "nino", "nina" ou "neutro" nos casos de *El Niño*, *La Niña* ou não ocorrência de nenhum dos dois, respectivamente
 + cpue: captura por unidade de pesca, ou seja, quantidade de peixes batata capturados em kg, dividida pelo número de dias de pesca
+
+## Análise Descritiva
 
 ```{r, echo=F, warning=FALSE, message=FALSE}
 library("GGally") 
@@ -63,8 +64,8 @@ dados <-  pivot_longer(data = dados, cols = colnames(dados)[2:ncol(dados)],
                names_to = "meses") |>
   filter(meses %in% c("JFM", "AMJ", "JAS", "OND"))
 
-dados <- dados |>
-  summarise(
+dados <- dados|>
+  dplyr::summarise(
     ano = as.numeric(Year),
     trimestre = case_when(
     meses == "JFM" ~ 1,
@@ -93,28 +94,40 @@ dados2 <- left_join(pesca, dados, by = c("ano", "trimestre")) |>
 
 Para melhor compreensão das variáveis a serem analisadas, vamos observar algumas de suas medidas descritivas:
 
-```{r, echo=F}
+```{r, echo=F, message=F, warning=FALSE}
 library(knitr)
 library(summarytools)
+library(papeR)
+# 
+# st_options(
+#   plain.ascii = FALSE, 
+#   style = "rmarkdown",
+#   dfSummary.style = "multiline",
+#   #dfSummary.valid.col = FALSE,
+#   dfSummary.graph.magnif = .52,
+#   subtitle.emphasis = FALSE,
+#   #tmp.img.dir = "/tmp",
+#   headings=FALSE,
+#   dfSummary.varnumbers = FALSE, 
+#   dfSummary.valid.col = FALSE,
+#   dfSummary.na.col = FALSE
+# )
+#  dfSummary(dados2)
 
-st_options(
-  plain.ascii = FALSE, 
-  style = "rmarkdown",
-  dfSummary.style = "grid",
-  dfSummary.valid.col = FALSE,
-  dfSummary.graph.magnif = .52,
-  subtitle.emphasis = FALSE,
-  tmp.img.dir = "/tmp"
-)
-# summary(dados2)
-# kable(summary(dados2 |> select(-c(frota, fenomeno))))
-dfSummary(dados2)
+library("knitr")
+library("dplyr")
+dados2$frota <- as.factor(dados2$frota)
+dados2$fenomeno <- as.factor(dados2$fenomeno)
+
+kable(papeR::summarize(dados2, type="numeric",  test = FALSE))
+kable(papeR::summarize(dados2, type="factor", variables = c("frota", "fenomeno"), test = FALSE))
+
 ```
 
 Também é importante verificar como a variável que vai ser modelada se distribui. Originalmente, temos a variável `cpue`, captura por unidade de esforço. Porém, como observado abaixo, essa variável apresenta uma assimetria à direita, assim usamos a Transformação de Box-cox com $\lambda = 0$ para tornar os dados mais simétricos e semelhantes à distribuição normal. Abaixo podemos observar a diferença na distribuição da variável `cpue` (variável original) e `cpue2`, (variável com Transformação de Box-Cox).
 
 
-```{r, warning=FALSE, message=FALSE}
+```{r, echo=F, warning=FALSE, message=FALSE, out.width="80%", fig.align='center'}
 ggplot(dados2, aes(x = cpue)) +
   geom_density(alpha = 0.5, fill = "violet", col = "violet") +  
   labs(
@@ -126,7 +139,7 @@ ggplot(dados2, aes(x = cpue)) +
 
 ```
 
-```{r, echo=F}
+```{r, echo=F, out.width="80%", fig.align='center'}
 
 ggplot(dados2, aes(x = cpue2)) +
   geom_density(alpha = 0.5, fill = "violet", col = "violet") +  
@@ -141,7 +154,7 @@ ggplot(dados2, aes(x = cpue2)) +
 
 A seguir vamos analisar como o comportamento da variável `cpue`é influenciada por outras variáveis.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, echo=FALSE, out.width="80%", fig.align='center'}
 ggplot(dados2, aes(x = fenomeno, y = cpue, fill = fenomeno)) +
   geom_boxplot() +
   labs(
@@ -156,7 +169,7 @@ ggplot(dados2, aes(x = fenomeno, y = cpue, fill = fenomeno)) +
 
 No gráfico acima podemos observar os efeitos dos fenômenos naturais *El Niño* e *La Niña* na captura de peixes por unidade de esforço. Notamos que durante o fenômeno *La Niña*, caracterizado pelo resfriamento das águas do Pacífico, causa uma significativa diminuição na captura, apresentando menor mediana e variabilidade nessa variável. Já o *El Niño*, que provova um aumento na temperatura das águas do pacífico, gera um leve aumento na captura quando comparado à ausência de fenômenos naturais, com variabilidade um pouco maior.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, echo=F, out.width="80%", fig.align='center'}
 ggplot(dados2, aes(x = cpue, fill = as.factor(ano))) +
   geom_density(alpha = 0.3) +
   labs(
@@ -170,7 +183,7 @@ ggplot(dados2, aes(x = cpue, fill = as.factor(ano))) +
 Nesse caso, estamos analisando como a captura por unidade de esforço se distribui por ano. Observamos que em 1995 essa variável se distribuía de forma mais homogênea, enquanto nos anos seguintes houve grande concentração em torno de 200 kg de peixe por dia de pesca. 
 
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, echo=FALSE, out.width="80%", fig.align='center'}
 ggplot(dados2, aes(x = cpue, fill = frota)) +
   geom_density(alpha = 0.3) +
   labs(
@@ -181,7 +194,9 @@ ggplot(dados2, aes(x = cpue, fill = frota)) +
   ) + theme_minimal() 
 ```
 
-```{r, warning=FALSE, message=FALSE}
+No gráfico acima, estamos interessados em observar a distribuição da captura por unidade de esforço por frota, que pode ser Santos ou Ubatuba. É possível observar que em Ubatuba a captura se concentra em valores menores, enquanto em Santos se concentra em um pouco acima e atinge valores mais altos.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, out.width="80%", fig.align='center'}
 ggplot(dados2, aes(x = trimestre, y = cpue, fill = as.factor(trimestre))) +
   geom_boxplot() +
   labs(
@@ -192,36 +207,65 @@ ggplot(dados2, aes(x = trimestre, y = cpue, fill = as.factor(trimestre))) +
   ) + 
   theme_minimal() 
 ```
+Aqui analisamos as medidas dos quartis e a variabilidade da captura em cada trimestre do ano. Podemos notar que no primeiro trimestre a mediana da captura por unidade de edforço é um pouco maior que a dos outros semestres, apresentando também maior variabilidade. Já os semestres seguintes não apresentam grande diferença nesses medidas entre si.
 
-```{r, warning=FALSE, message=FALSE}
+## Correlação
+
+A correlação descreve como as mudanças em uma variável estão associadas às mudanças em outra variável. A correlação é expressa por um coeficiente de correlação, que varia de -1 a 1. Um coeficiente de correlação próximo de 1 indica uma forte correlação positiva, o que significa que as duas variáveis tendem a aumentar juntas. Um coeficiente de correlação próximo de -1 indica uma forte correlação negativa, onde uma variável tende a diminuir quando a outra aumenta. Um coeficiente de correlação próximo de 0 indica que não há correlação linear entre as variáveis.
+
+A correlação é importante na análise de regressão porque ajuda a entender a relação entre as variáveis independentes e a variável dependente. Antes de construir um modelo de regressão, é crucial examinar a correlação entre as variáveis independentes e a variável dependente. Se houver uma correlação forte entre uma variável independente e a variável dependente, isso sugere que a variável independente pode ser um bom preditor da variável dependente e pode ser incluída no modelo de regressão.
+
+A seguir é possível visualizar a correlação entre as variáveis numéricas que estamos trabalhando:
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library("corrplot")
+
 ggcorr(select(dados2, -c(cpue2)), geom = "blank", label = TRUE, hjust = 0.75) +
   geom_point(size = 10, aes(color = coefficient >= 0, alpha = abs(coefficient) >= 0.05)) +
   scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
   guides(color = FALSE, alpha = FALSE)
 ```
+Nota-se que, com exceção das variáveis `latitude` e `longitude`, que apresentam alta correlação, as variáveis apresentam baixa correlação ou nenhuma correlação entre si.
 
-```{r, warning=FALSE, message=FALSE}
-dados2 <- dados2 |> select(-c(cpue))
+## Modelagem
 
-modelo <- stats::lm(cpue2 ~ ., data=dados2)
-summary(modelo)
+Um modelo de regressão linear visa descrever a relação entre uma variável dependente (também chamada de variável de resposta) e uma ou mais variáveis independentes (também conhecidas como preditoras ou explicativas). Para selecionar o modelo que melhor se ajusta aos dados, vamos usar como base o Critério de Informação de Akaike (AIC), que é uma medida que apresenta menor valor para o melhor modelo. Logo, nosso objetivo é encontrar o modelo que apresenta o menor AIC.
 
-opt_model_step_aic<- stepAIC(modelo, direction="both") 
-summary(opt_model_step_aic)
-```
+Para isso, vamos utilizar o método de seleção de variáveis chamado *Stepwise*, que começa com o modelo completo, ou seja, com todas as variáveis no modelo e remove ou adiciona as variáveis caso uma dessas opções gere uma diminuição no AIC. Quando nenhuma dessas ações ocasiona um menor AIC, consideramos que o melhor modelo foi obtido. 
+
+Em R, executamos esse processo primeiro utilizando a função `lm()`, que ajusta o modelo aos dados, estimando os coeficientes que melhor ajustam os dados observados. Em seguida, usamos a função,  `stepAIC()`, com argumento `direction="both"`, que funciona seguindo um procedimento iterativo que envolve adicionar ou remover variáveis independentes do modelo, uma de cada vez, e comparar os valores do AIC para determinar se a adição ou remoção da variável resulta em uma melhoria no ajuste do modelo. O processo continua até que nenhuma alteração adicional resulte em uma redução significativa no AIC.
+
+Ao executar esse processo aplicado aos dados de pesca no R, obtemos que as variáveis presentes no modelo para descrever a variável `cpue2` são frota, latitude, longitude e fenômeno, com coeficientes 0.20857, -0.12413, -0.44620 (em caso de *La Niña*) e 0.09949 (em caso de *El Niño*, respectivamente). 
+
 
 # Conclusão
 
-Neste estudo, exploramos a relação entre a captura por unidade de esforço (CPUE) e uma série de variáveis que influenciam a atividade pesqueira, incluindo frota, latitude, longitude e a presença dos fenômenos climáticos El Niño e La Niña. Utilizando análise de regressão estatística, desenvolvemos um modelo que incorpora essas variáveis e busca prever a CPUE de maneira precisa e robusta.
+Neste estudo, exploramos a relação entre a captura por unidade de esforço (CPUE) e uma série de variáveis que influenciam a atividade pesqueira, incluindo frota, latitude, longitude e a presença dos fenômenos climáticos El Niño e La Niña. Utilizando análise de regressão estatística, desenvolvemos um modelo que incorpora essas variáveis para descrever a CPUE.
 
 Os resultados obtidos demonstram que a frota de pesca desempenha um papel significativo na determinação da captura por unidade de esforço, refletindo as diferenças nas capacidades técnicas, métodos de pesca e estratégias de operação entre as embarcações. Além disso, as coordenadas geográficas (latitude e longitude) mostraram-se importantes para capturar variações na distribuição e abundância de recursos pesqueiros em diferentes regiões.
 
 A inclusão dos fenômenos El Niño e La Niña no modelo revelou sua relevância na explicação da variação na CPUE. Esses eventos climáticos globais influenciam diretamente as condições oceânicas e atmosféricas, afetando a disponibilidade de alimento, padrões de migração e comportamento dos peixes, e, consequentemente, a eficiência da pesca.
 
-Ao adotar um modelo que considera esses fatores inter-relacionados, somos capazes de melhorar nossa compreensão das complexas dinâmicas da atividade pesqueira e, por conseguinte, auxiliar na formulação de estratégias de manejo mais eficazes e sustentáveis. Tal abordagem não apenas permite uma exploração mais precisa dos recursos pesqueiros, mas também contribui para a conservação dos ecossistemas marinhos e para o bem-estar das comunidades que dependem da pesca para subsistência e sustento econômico.
+Ao adotar um modelo que considera esses fatores inter-relacionados, somos capazes de melhorar nossa compreensão das complexas dinâmicas da atividade pesqueira e, por conseguinte, auxiliar na formulação de estratégias de manejo mais eficazes e sustentáveis. No entanto, é importante ressaltar que qualquer modelo de previsão está sujeito a limitações e incertezas inerentes à complexidade dos sistemas naturais. 
 
-No entanto, é importante ressaltar que qualquer modelo de previsão está sujeito a limitações e incertezas inerentes à complexidade dos sistemas naturais. Portanto, recomenda-se a continuidade da pesquisa e monitoramento contínuo das condições pesqueiras, a fim de adaptar e aprimorar as estratégias de manejo conforme necessário, garantindo a saúde e a resiliência dos ecossistemas marinhos e das comunidades dependentes da pesca.
+# Apêndice
+Códigos utilizados para obter o modelo de regressão:
 
+```{r}
+library(papeR)
+
+dados2 <- dados2 |> select(-c(cpue))
+
+modelo <- stats::lm(cpue2 ~ ., data=dados2)
+summary(modelo)
+
+```
+```{r}
+opt_model_step_aic<- stepAIC(modelo, direction="both") 
+summary(opt_model_step_aic)
+
+
+```
 
 
 

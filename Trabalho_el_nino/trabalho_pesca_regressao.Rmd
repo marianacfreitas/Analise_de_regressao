@@ -65,6 +65,7 @@ dados <-  pivot_longer(data = dados, cols = colnames(dados)[2:ncol(dados)],
   filter(meses %in% c("JFM", "AMJ", "JAS", "OND"))
 
 dados <- dados|>
+  dplyr::mutate(value=as.numeric(value)) |>
   dplyr::summarise(
     ano = as.numeric(Year),
     trimestre = case_when(
@@ -167,7 +168,7 @@ ggplot(dados2, aes(x = fenomeno, y = cpue, fill = fenomeno)) +
 
 ```
 
-No gráfico acima podemos observar os efeitos dos fenômenos naturais *El Niño* e *La Niña* na captura de peixes por unidade de esforço. Notamos que durante o fenômeno *La Niña*, caracterizado pelo resfriamento das águas do Pacífico, causa uma significativa diminuição na captura, apresentando menor mediana e variabilidade nessa variável. Já o *El Niño*, que provova um aumento na temperatura das águas do pacífico, gera um leve aumento na captura quando comparado à ausência de fenômenos naturais, com variabilidade um pouco maior.
+No gráfico acima podemos observar os efeitos dos fenômenos naturais *El Niño* e *La Niña* na captura de peixes por unidade de esforço. Notamos que durante o fenômeno *La Niña*, caracterizado pelo resfriamento das águas do Pacífico, e do *El Niño*, que provova um aumento na temperatura das águas do pacífico, há um significativo aumento na captura quando comparado à ausência de fenômenos naturais, com variabilidade também maior.
 
 ```{r, warning=FALSE, message=FALSE, echo=F, out.width="80%", fig.align='center'}
 ggplot(dados2, aes(x = cpue, fill = as.factor(ano))) +
@@ -235,7 +236,8 @@ Para isso, vamos utilizar o método de seleção de variáveis chamado *Stepwise
 
 Em R, executamos esse processo primeiro utilizando a função `lm()`, que ajusta o modelo aos dados, estimando os coeficientes que melhor ajustam os dados observados. Em seguida, usamos a função,  `stepAIC()`, com argumento `direction="both"`, que funciona seguindo um procedimento iterativo que envolve adicionar ou remover variáveis independentes do modelo, uma de cada vez, e comparar os valores do AIC para determinar se a adição ou remoção da variável resulta em uma melhoria no ajuste do modelo. O processo continua até que nenhuma alteração adicional resulte em uma redução significativa no AIC.
 
-Ao executar esse processo aplicado aos dados de pesca no R, obtemos que as variáveis presentes no modelo para descrever a variável `cpue2` são frota, latitude, longitude e fenômeno, com coeficientes 0.20857, -0.12413, -0.44620 (em caso de *La Niña*) e 0.09949 (em caso de *El Niño*, respectivamente). 
+Ao executar esse processo aplicado aos dados de pesca no R, obtemos que as variáveis presentes no modelo para descrever a variável `cpue2` são frota, latitude, longitude e fenômeno, com coeficientes -0.20244, 0.19974,
+-0.10525, 0.33883 (em caso de *La Niña*) e 0.47914 (em caso de *El Niño*, respectivamente). 
 
 
 # Conclusão

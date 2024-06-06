@@ -49,6 +49,99 @@ df <- df |>
 
 # ANÁLISE DESCRITIVA
 
+
+# Histograma da variável 'glucose'
+
+ggplot(df, aes(x = glucose)) +
+  geom_density(alpha = 0.5, fill = "violet", col = "violet") +  
+  labs(
+    #title = "Histograma de Densidade",
+    x = "Captura por unidade de pesca",
+    y = "Densidade"
+  ) + theme_minimal() + 
+  geom_vline(xintercept = mean(df$glucose), linetype = "dashed", color = "black")
+
+# Gráfico de dispersão glucose x blood_pressure
+
+ggplot(data = df, aes(x = glucose, y = blood_pressure)) +
+  geom_point(col = "violet") +  
+  labs(x = "Concentração de glicose", y = "Pressão arterial", title = " ")  + theme_minimal()
+
+# Gráfico de dispersão glucose x bmi
+
+ggplot(data = df, aes(x = glucose, y = bmi)) +
+  geom_point(col = "violet") +  
+  labs(x = "Concentração de glicose", y = "Índice de massa corporal", title = " ")  + theme_minimal()
+
+# Gráfico de dispersão glucose x diabates_pedigree_function
+
+ggplot(data = df, aes(x = glucose, y = diabetes_pedigree_function)) +
+  geom_point(col = "violet") +  
+  labs(x = "Concentração de glicose", y = "Diabetes função da genealogia", title = " ")  + theme_minimal()
+
+# Gráfico densidade glucose para os diabéticos e não diabéticos
+
+ggplot(df, aes(x = glucose, fill = as.factor(outcome))) +
+  geom_density(alpha = 0.3) +
+  labs(
+    title = " ",
+    x = "Concentração de glicose",
+    y = "Teste de diabetes",
+    fill = 'Teste de diabetes'
+  ) + theme_minimal() + 
+  scale_fill_manual(values = c("0" = "violet", "1" = "grey"),
+                     labels = c("Saudável", "Diabético"))
+
+# Box plot glucose por idade discretizada
+
+df2 <- df
+df2 <- df2|>
+  mutate(
+    age_interval = case_when(
+      age <= 29 & age >= 21 ~ "21 a 29",
+      age <= 35 & age >= 30 ~ "30 a 35",
+      age <= 43 & age >= 36 ~ "36 a 43",
+      age <= 50 & age >= 44 ~ "44 a 50",
+      age <= 56 & age >= 51 ~ "51 a 56",
+      age <= 63 & age >= 57 ~ "57 a 63",
+      age <= 70 & age >= 64 ~ "64 a 70",
+      age <= 75 & age >= 71 ~ "71 a 75",
+      age <= 81 & age >= 76 ~ "76 a 81",
+    ),
+    
+    preg_interval = case_when(
+      pregnancies == 0 ~ "Sem gestações",
+      pregnancies >= 1 & pregnancies <= 2 ~ "1 a 2",
+      pregnancies >= 3 & pregnancies <= 5 ~ "3 a 5",
+      pregnancies >= 10 & pregnancies <= 13 ~ "10 a 13",
+      pregnancies >= 6 & pregnancies <= 9 ~ "6 a 9",
+      pregnancies >= 14 & pregnancies <= 17 ~ "14 a 17"
+      )
+  )
+
+ggplot(df2, aes(x = age_interval, y = glucose, fill = age_interval)) +
+  geom_boxplot() +
+  labs(
+    x = "Idade em anos",
+    y = "Concentração de glicose"
+  ) + theme_minimal()
+
+
+# Gráfico de violino glucose por número de gestações discretizada
+
+df2$preg_interval <- factor(df2$preg_interval, levels = c("Sem gestações", "1 a 2", "3 a 5", "6 a 9", "10 a 13", "14 a 17"))
+
+
+ggplot(df2, aes(x = preg_interval, y = glucose, fill = preg_interval)) +
+  geom_violin() +
+  labs(
+    title = " ",
+    x = "Número de gestações",
+    y = "Concentração de glicose",
+    fill = 'Número de gestações'
+  ) +
+  theme_minimal()
+
 # ANÁLISE DE CORRELAÇÃO
 
 ggcorr(df, geom = "blank", label = TRUE, hjust = 0.75) +
@@ -209,7 +302,7 @@ bptest(fit)			      # teste de Breusch-Pagan
 # (1) TRANSFORMAR OS DADOS PARA ELIMINA-LA; OU
 # (2) INCORPORA-LA AO MODELO COM OS COMANDOS ABAIXO
 
-fit.gamlss<- gamlss(y ~ ., sigma.formula = ~ ., data=df)
+fit.gamlss<- gamlss(glucose ~ ., sigma.formula = ~ ., data=df)
 fit.gamlss %>% summary()
 
 # ERROS NÃO-CORRELACIONADOS

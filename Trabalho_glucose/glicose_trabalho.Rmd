@@ -1,0 +1,65 @@
+---
+title: "Trabalho de Regressão II"
+author: "Mariana Costa freitas"
+date: "2024-06-06"
+output: pdf_document
+---
+# Introdução
+
+# Análise dos dados
+
+# Análise descritiva
+
+```{r, warning=FALSE, message=FALSE}
+library("GGally")     # grafico em matriz
+library("MASS")		    # stepwise (aic)
+library("mixlm")		  # stepwise (valor-p)
+library("tidyverse")	# manipulacao de dados
+library("rvest")
+library("reshape2")
+library("dplyr")
+library("ggplot2")
+library("readr")
+library("janitor")
+library("plotly")
+library(car)    	  # vif - multicolinearidade
+library(nortest)  	# normalidade
+library(lmtest)		  # homocedasticidade e auto-correlação
+library(gamlss)		  # incorporando heterocedasticidade
+library(nlme)		    # incorporando auto-correlação
+
+
+# IMPORTANDO DADOS
+
+df <- read_csv("Trabalho_glucose/glicose.csv") |>
+  clean_names()
+
+library("knitr")
+library("papeR")
+kable(papeR::summarize(df, type="numeric",  test = FALSE))
+```
+```{r, warning=FALSE, message=FALSE}
+freq_na <- c(nrow(filter(df, glucose == 0)), 
+             nrow(filter(df, blood_pressure == 0)),
+             nrow(filter(df, skin_thickness == 0)),
+             nrow(filter(df, insulin == 0)),
+             nrow(filter(df, bmi==0)),
+             nrow(filter(df, age==0)),
+             nrow(filter(df, is.na(pregnancies))),
+             nrow(filter(df, is.na(outcome))),
+             nrow(filter(df, diabetes_pedigree_function==0))
+             )
+nomes <- c("glucose", "blood_pressure", "skin_thickness", "insulin",
+           "bmi", "age", "pregnancies", "outcome", "diabetes_pedigree_function")
+
+df_na <- data.frame(nomes, freq_na)
+colnames(df_na) <- c("Variável", "Frequência de dados faltantes")
+kable(df_na)
+# knitr::kable(tabela_freq_na, caption = "Tabela de Frequência")
+```
+```{r, }
+
+```
+
+
+

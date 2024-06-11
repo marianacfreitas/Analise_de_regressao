@@ -2,15 +2,39 @@
 title: "Trabalho de Regressão II"
 author: "Mariana Costa freitas"
 date: "2024-06-06"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 # Introdução
 
+O diabetes é uma condição crônica que afeta milhões de pessoas em todo o mundo, e seu diagnóstico precoce é fundamental para a prevenção de complicações graves. Nesse contexto, o Instituto Nacional de Diabetes e Doenças Digestivas e Renais realizou um estudo com mulheres Pimas adultas residentes na região de Phoenix, Arizona, com o objetivo de investigar fatores que possam influenciar a concentração de glicose no sangue, medida através de um teste oral de tolerância à glicose.
+
+Este relatório apresenta uma análise de regressão para a variável Glucose, a fim de identificar os principais fatores associados a suas variações. As variáveis utilizadas no estudo incluem características fisiológicas e dados demográficos das participantes:
+
+O objetivo principal deste estudo é construir um modelo de regressão linear para a variável Glucose e verificar a adequação desse modelo através da análise dos pressupostos fundamentais da regressão linear, tais como linearidade, independência dos resíduos, homocedasticidade e normalidade dos resíduos.
+
+Ao final, espera-se identificar as variáveis que mais influenciam a concentração de glicose no sangue e fornecer insights valiosos para estratégias de prevenção e tratamento do diabetes entre as mulheres Pimas.
+
 # Análise dos dados
+
+Nessa análise estamos utilizando os dados disponibilizados pelo Instituto Nacional de Diabetes e Doenças Digestivas e Renais, obtidos por meio de uma pesquisa feita em índias Pimas adultas que vivem perto de Phoenix-Arizona. As variáveis abordadas no banco de dados são:
+
++ pregnancies: número de gestações
++ glucose: concentração de glicose em teste oral de tolerância à glicose
++ blood_pressure: pressão arterial diastólica (mm Hg)
++ skin_thickness: espessura cutânea triciptal (mm)
++ insulin: 2 horas de insulina no soro (mu U/ml)
++ bmi: índice de massa corporal (IMC)
++ diabetes_pedigree_function: função que mede as chances de ter diabetes baseada no histórico familiar
++ age: idade em anos
++ outcome: resultado do teste para diabetes, que pode ser saudável (outcome=0) ou diabético (outcome=1)
 
 # Análise descritiva
 
-```{r, warning=FALSE, message=FALSE}
+Para melhor compreensão dos dados que estamos utilizando, vamos obter algumas de suas medidas descritivas:
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
 library("GGally")     # grafico em matriz
 library("MASS")		    # stepwise (aic)
 library("mixlm")		  # stepwise (valor-p)
@@ -31,14 +55,17 @@ library(nlme)		    # incorporando auto-correlação
 
 # IMPORTANDO DADOS
 
-df <- read_csv("Trabalho_glucose/glicose.csv") |>
+df <- read_csv("glicose.csv") |>
   clean_names()
 
 library("knitr")
 library("papeR")
 kable(papeR::summarize(df, type="numeric",  test = FALSE))
 ```
-```{r, warning=FALSE, message=FALSE}
+
+Essas variáveis apresentam muitos dados faltantes que podem prejudicar nossas análises e posteriormente também o desenvolvimento do modelo de regressão. Assim, é necessário remover od dados faltantes, e remover aquelas variáveis que apresentam alta quantidade desses dados.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
 freq_na <- c(nrow(filter(df, glucose == 0)), 
              nrow(filter(df, blood_pressure == 0)),
              nrow(filter(df, skin_thickness == 0)),
@@ -57,9 +84,569 @@ colnames(df_na) <- c("Variável", "Frequência de dados faltantes")
 kable(df_na)
 # knitr::kable(tabela_freq_na, caption = "Tabela de Frequência")
 ```
-```{r, }
+Dessa forma, vamos excluir as variáveis `insulin` e `skin_thickness`e remover os dados faltantes de `glucose`, `blood_pressure` e `bmi`. O restante das variáveis não apresentam dados faltantes, então não vamos alterá-las. Abaixo podemos observar as novas medidas descritivas após o tratamento desses dados.
+
+```{r, warning=FALSE, message=F, echo=FALSE}
+
+# Retirando os dados faltantes
+
+df <- df |>
+  select(-c(insulin, skin_thickness)) |>
+  filter(glucose != 0 & blood_pressure != 0 & bmi != 0)
+
+kable(papeR::summarize(df, type="numeric",  test = FALSE))
+
 
 ```
+Um importante passo na análise descritiva é verificar o comportamento da variável `glucose`, que será a variável descrita pelo modelo de regressão. Abaixo, construímos um histograma para melhor entender a sua distribuição.
+
+```{r, warning=F, message=FALSE, echo=FALSE}
+# Histograma da variável 'glucose'
+
+ggplot(df, aes(x = glucose)) +
+  geom_density(alpha = 0.5, fill = "violet", col = "violet") +  
+  labs(
+    #title = "Histograma de Densidade",
+    x = "Captura por unidade de pesca",
+    y = "Densidade"
+  ) + theme_minimal() + 
+  geom_vline(xintercept = mean(df$glucose), linetype = "dashed", color = "black")
+
+```
+
+Aqui percebemos que seu gráfico de densidade apresenta leve assimetria a direita, então futuramente talvez seja necessário realizar uma transformação de Box-Cox.
+
+Também vamos observar o comportamento de `glucose` associada a outras variáveis abaixo.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# Gráfico de dispersão glucose x blood_pressure
+
+ggplot(data = df, aes(x = glucose, y = blood_pressure)) +
+  geom_point(col = "violet") +  
+  labs(x = "Concentração de glicose", y = "Pressão arterial", title = " ")  + theme_minimal()
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# Box plot glucose por idade discretizada
+
+df2 <- df
+df2 <- df2|>
+  mutate(
+    age_interval = case_when(
+      age <= 29 & age >= 21 ~ "21 a 29",
+      age <= 35 & age >= 30 ~ "30 a 35",
+      age <= 43 & age >= 36 ~ "36 a 43",
+      age <= 50 & age >= 44 ~ "44 a 50",
+      age <= 56 & age >= 51 ~ "51 a 56",
+      age <= 63 & age >= 57 ~ "57 a 63",
+      age <= 70 & age >= 64 ~ "64 a 70",
+      age <= 75 & age >= 71 ~ "71 a 75",
+      age <= 81 & age >= 76 ~ "76 a 81",
+    ),
+    
+    preg_interval = case_when(
+      pregnancies == 0 ~ "Sem gestações",
+      pregnancies >= 1 & pregnancies <= 2 ~ "1 a 2",
+      pregnancies >= 3 & pregnancies <= 5 ~ "3 a 5",
+      pregnancies >= 10 & pregnancies <= 13 ~ "10 a 13",
+      pregnancies >= 6 & pregnancies <= 9 ~ "6 a 9",
+      pregnancies >= 14 & pregnancies <= 17 ~ "14 a 17"
+      )
+  )
+
+ggplot(df2, aes(x = age_interval, y = glucose, fill = age_interval)) +
+  geom_boxplot() +
+  labs(
+    x = "Idade em anos",
+    y = "Concentração de glicose"
+  ) + theme_minimal()
+
+
+```
+
+```{r, message=F, warning=FALSE, echo=FALSE}
+
+# Gráfico de dispersão glucose x bmi
+
+ggplot(data = df, aes(x = glucose, y = bmi)) +
+  geom_point(col = "violet") +  
+  labs(x = "Concentração de glicose", y = "Índice de massa corporal", title = " ")  + theme_minimal()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# Gráfico de violino glucose por número de gestações discretizada
+
+df2$preg_interval <- factor(df2$preg_interval, levels = c("Sem gestações", "1 a 2", "3 a 5", "6 a 9", "10 a 13", "14 a 17"))
+
+
+ggplot(df2, aes(x = preg_interval, y = glucose, fill = preg_interval)) +
+  geom_violin() +
+  labs(
+    title = " ",
+    x = "Número de gestações",
+    y = "Concentração de glicose",
+    fill = 'Número de gestações'
+  ) +
+  theme_minimal()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# Gráfico de dispersão glucose x diabates_pedigree_function
+
+ggplot(data = df, aes(x = glucose, y = diabetes_pedigree_function)) +
+  geom_point(col = "violet") +  
+  labs(x = "Concentração de glicose", y = "Diabetes função da genealogia", title = " ")  + theme_minimal()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# Gráfico densidade glucose para os diabéticos e não diabéticos
+
+ggplot(df, aes(x = glucose, fill = as.factor(outcome))) +
+  geom_density(alpha = 0.3) +
+  labs(
+    title = " ",
+    x = "Concentração de glicose",
+    y = "Teste de diabetes",
+    fill = 'Teste de diabetes'
+  ) + theme_minimal() + 
+  scale_fill_manual(values = c("0" = "violet", "1" = "grey"),
+                     labels = c("Saudável", "Diabético"))
+
+```
+
+# Análise de correlação
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+
+ggcorr(df, geom = "blank", label = TRUE, hjust = 0.75) +
+  geom_point(size = 10, aes(color = coefficient >= 0, alpha = abs(coefficient) >= 0.05)) +
+  scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
+  guides(color = FALSE, alpha = FALSE)
+
+```
+
+# Análise de Regressão
+
+## Modelo
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+# MODELO 
+
+modelo <- stats::lm(glucose ~ ., data=df)
+summary(modelo)
+
+opt_model_step_aic<- stepAIC(modelo, direction="both") 
+summary(opt_model_step_aic)
+
+
+
+```
+## Verificando pressupostos do modelo
+
+#### Pontos influentes e de alavanca
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+fit<- opt_model_step_aic
+
+n<- nrow(df)    		        # número de observações
+k<- length(fit$coef) 		    # k=p+1 (número de coeficientes)
+
+corte.hii<- 2*k/n		        # corte para elementos da diagonal de H
+corte.cook<- qf(0.5,k,n-k)	# corte para Distância de Cook
+corte.stu<- 2			          # corte para resíduos estudentizados
+
+rst<- rstudent(fit)		      # resíduos estudentizados
+hii<- hatvalues(fit) 		    # valores da diagonal da matriz H
+dcook<- cooks.distance(fit)	# distância de Cook
+
+obs<- 1:n
+
+df.fit<- data.frame(obs,rst,hii,dcook)
+
+# GRÁFICO - RESÍDUOS ESTUDENTIZADOS
+
+df.fit %>% ggplot(aes(x=obs,y=rst)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(-corte.stu, corte.stu), color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Resíduo Estudentizado") + 
+  theme_bw()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+
+#Retirando os dados discrepantes
+
+obs_index_rst <- df.fit |> filter(rst <= 2 & rst >= -2)
+df <- df[obs_index_rst$obs,]
+
+# Refazendo o modelo
+
+modelo2 <- stats::lm(glucose ~ ., data=df)
+summary(modelo2)
+
+opt_model_step_aic2 <- stepAIC(modelo2, direction="both") 
+summary(opt_model_step_aic2)
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+#Refazendo o gráfico dos resíduos estudentizados
+
+fit2 <- opt_model_step_aic2
+
+n2<- nrow(df)    		        # número de observações
+k2<- length(fit2$coef) 		    # k=p+1 (número de coeficientes)
+
+corte.hii2<- 2*k2/n2		        # corte para elementos da diagonal de H
+corte.cook2<- qf(0.5,k2,n2-k2)	# corte para Distância de Cook
+corte.stu2<- 2			          # corte para resíduos estudentizados
+
+rst2<- rstudent(fit2)		      # resíduos estudentizados
+hii2<- hatvalues(fit2) 		    # valores da diagonal da matriz H
+dcook2<- cooks.distance(fit2)	# distância de Cook
+
+obs2<- 1:n2
+df.fit2<- data.frame(obs2,rst2,hii2,dcook2)
+
+df.fit2 %>% ggplot(aes(x=obs2,y=rst2)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(-corte.stu2, corte.stu2), color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Resíduo Estudentizado") + 
+  theme_bw()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+
+#Retirando os dados discrepantes
+
+obs_index_rst2 <- df.fit2 |> filter(rst2 <= 2 & rst2 >= -2)
+df <- df[obs_index_rst2$obs,]
+
+# Refazendo o modelo
+
+modelo3 <- stats::lm(glucose ~ ., data=df)
+summary(modelo3)
+
+opt_model_step_aic3 <- stepAIC(modelo3, direction="both") 
+summary(opt_model_step_aic3)
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+#Refazendo o gráfico dos resíduos estudentizados
+
+fit3 <- opt_model_step_aic3
+
+n3<- nrow(df)    		        # número de observações
+k3<- length(fit3$coef) 		    # k=p+1 (número de coeficientes)
+
+corte.hii3<- 2*k3/n3		        # corte para elementos da diagonal de H
+corte.cook3<- qf(0.5,k3,n3-k3)	# corte para Distância de Cook
+corte.stu3<- 2			          # corte para resíduos estudentizados
+
+rst3<- rstudent(fit3)		      # resíduos estudentizados
+hii3<- hatvalues(fit3) 		    # valores da diagonal da matriz H
+dcook3<- cooks.distance(fit3)	# distância de Cook
+
+obs3 <- 1:n3
+df.fit3<- data.frame(obs3,rst3,hii3,dcook3)
+
+df.fit3 %>% ggplot(aes(x=obs3,y=rst3)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(-corte.stu3, corte.stu3), color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Resíduo Estudentizado") + 
+  theme_bw()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# GRÁFICO - ALAVANCAGEM
+
+df.fit3 %>% ggplot(aes(x=obs3,y=hii3,ymin=0,ymax=hii3)) + 
+  geom_point() + 
+  geom_linerange() + 
+  geom_hline(yintercept = corte.hii3, color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Alavancagem") + 
+  theme_bw()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+
+#Retirando os dados discrepantes
+
+obs_index_hii3 <- df.fit3 |> filter(hii3 <= corte.hii3)
+df <- df[obs_index_hii3$obs,]
+
+# Refazendo o modelo
+
+modelo4 <- stats::lm(glucose ~ ., data=df)
+summary(modelo4)
+
+opt_model_step_aic4 <- stepAIC(modelo4, direction="both") 
+summary(opt_model_step_aic4)
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+#Refazendo o gráfico de alavancagem
+
+fit4 <- opt_model_step_aic4
+
+n4<- nrow(df)    		        # número de observações
+k4<- length(fit4$coef) 		    # k=p+1 (número de coeficientes)
+
+corte.hii4<- 2*k4/n4		        # corte para elementos da diagonal de H
+corte.cook3<- qf(0.5,k4,n4-k4)	# corte para Distância de Cook
+corte.stu3<- 2			          # corte para resíduos estudentizados
+
+rst4<- rstudent(fit4)		      # resíduos estudentizados
+hii4<- hatvalues(fit4) 		    # valores da diagonal da matriz H
+dcook4<- cooks.distance(fit4)	# distância de Cook
+
+obs4 <- 1:n4
+df.fit4<- data.frame(obs4,rst4,hii4,dcook4)
+
+df.fit4 %>% ggplot(aes(x=obs4,y=hii4,ymin=0,ymax=hii4)) + 
+  geom_point() + 
+  geom_linerange() + 
+  geom_hline(yintercept = corte.hii4, color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Alavancagem") + 
+  theme_bw()
+
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+
+#Retirando os dados discrepantes
+
+obs_index_hii4 <- df.fit4 |> filter(hii4 <= corte.hii4)
+df <- df[obs_index_hii4$obs,]
+
+# Refazendo o modelo
+
+modelo5 <- stats::lm(glucose ~ ., data=df)
+summary(modelo5)
+
+opt_model_step_aic5 <- stepAIC(modelo5, direction="both") 
+summary(opt_model_step_aic5)
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+#Refazendo o gráfico de alavancagem
+
+fit5 <- opt_model_step_aic5
+
+n5<- nrow(df)    		        # número de observações
+k5<- length(fit5$coef) 		    # k=p+1 (número de coeficientes)
+
+corte.hii5<- 2*k5/n5		        # corte para elementos da diagonal de H
+corte.cook5<- qf(0.5,k5,n5-k5)	# corte para Distância de Cook
+corte.stu5<- 2			          # corte para resíduos estudentizados
+
+rst5<- rstudent(fit5)		      # resíduos estudentizados
+hii5<- hatvalues(fit5) 		    # valores da diagonal da matriz H
+dcook5<- cooks.distance(fit5)	# distância de Cook
+
+obs5 <- 1:n5
+df.fit5<- data.frame(obs5,rst5,hii5,dcook5)
+
+df.fit5 %>% ggplot(aes(x=obs5,y=hii5,ymin=0, ymax=hii5)) + 
+  geom_point() + 
+  geom_linerange() + 
+  geom_hline(yintercept = corte.hii5, color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Alavancagem") + 
+  theme_bw()
+
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# GRÁFICO - DISTÂNCIA DE COOK
+
+df.fit5 %>% ggplot(aes(x=obs5,y=dcook5,ymin=0,ymax=dcook5)) + 
+  geom_point() + 
+  geom_linerange() +
+  geom_hline(yintercept = corte.cook5, color="red", linetype="dashed") + 
+  xlab("Observação") + 
+  ylab("Distância de Cook") + 
+  theme_bw()
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+
+# GRÁFICO GERAL DE DIAGNÓSTICO
+
+texto<- paste("observ:",obs5,"\n",
+              "resid_stud:",round(rst5,2),"\n",
+              "alavancagem:",round(hii5,2),"\n",
+              "D_Cook:",round(dcook5,2),"\n",
+              "corte_Cook:",round(corte.cook5,2))
+
+ggplotly(
+  
+  df.fit5 %>% ggplot(aes(x=hii5,y=rst5,text=texto)) +
+    geom_point(aes(size=dcook5)) + 
+    xlim(0, max(max(hii5),corte.hii5)) + 
+    ylim(-max(abs(rst5),corte.stu5), max(abs(rst5),corte.stu5)) + 
+    geom_hline(yintercept = c(-corte.stu5, corte.stu5), color="red", linetype="dashed") + 
+    geom_vline(xintercept = corte.hii5, color="red", linetype="dashed") + 
+    theme_bw() +
+    theme(legend.position="none") + 
+    xlab("Alavancagem") + 
+    ylab("Resíduo Estudentizado"),
+  tooltip = c("text")
+  
+)
+
+```
+
+## Normalidade
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# TESTE DE NORMALIDADE
+
+t1 <- ks.test(rst5,"pnorm")	#KS
+t2 <- lillie.test(rst5)		  # Lilliefors
+t3 <- cvm.test(rst5)		      # Cramér-von Mises
+t4 <- shapiro.test(rst5)		  # Shapiro-Wilk
+t5 <- sf.test(rst5)		      # Shapiro-Francia
+t6 <- ad.test(rst5)		      # Anderson-Darling
+
+# Tabela de resultados
+testes <- c(t1$method, t2$method, t3$method, t4$method, t5$method,t6$method)
+estt <- as.numeric(c(t1$statistic,
+                     t2$statistic,
+                     t3$statistic,
+                     t4$statistic,
+                     t5$statistic,
+                     t6$statistic))
+valorp <- c(t1$p.value, t2$p.value, t3$p.value, t4$p.value, t5$p.value,t6$p.value)
+resultados <- cbind(estt, valorp)
+rownames(resultados) <- testes
+colnames(resultados) <- c("Estatística", "p")
+round(resultados, digits = 4)
+
+
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# TRANSFORMAÇÃO BOXCOX
+
+transf_boxcox <- fit5 %>% boxcox(data=df)
+lambda<- transf_boxcox$x[which.max(transf_boxcox$y)]
+
+```
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- df |>
+  mutate(glucose_bc = (glucose^lambda - 1)/lambda) |>
+  select(-c(glucose))
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+
+# Refazendo o modelo
+
+modelo6 <- stats::lm(glucose_bc ~ ., data=df)
+summary(modelo6)
+
+opt_model_step_aic6 <- stepAIC(modelo6, direction="both") 
+summary(opt_model_step_aic6)
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+# TESTE DE NORMALIDADE
+
+fit6 <- opt_model_step_aic6
+rst6<- rstudent(fit6)		      # resíduos estudentizados
+
+t1 <- ks.test(rst6,"pnorm")	#KS
+t2 <- lillie.test(rst6)		  # Lilliefors
+t3 <- cvm.test(rst6)		      # Cramér-von Mises
+t4 <- shapiro.test(rst6)		  # Shapiro-Wilk
+t5 <- sf.test(rst6)		      # Shapiro-Francia
+t6 <- ad.test(rst6)		      # Anderson-Darling
+
+# Tabela de resultados
+testes <- c(t1$method, t2$method, t3$method, t4$method, t5$method,t6$method)
+estt <- as.numeric(c(t1$statistic,
+                     t2$statistic,
+                     t3$statistic,
+                     t4$statistic,
+                     t5$statistic,
+                     t6$statistic))
+valorp <- c(t1$p.value, t2$p.value, t3$p.value, t4$p.value, t5$p.value,t6$p.value)
+resultados <- cbind(estt, valorp)
+rownames(resultados) <- testes
+colnames(resultados) <- c("Estatística", "p")
+round(resultados, digits = 4)
+
+```
+
+## Homoscedasticidade
+
+```{r, warning=FALSE, message=FALSE}
+
+bptest(fit6)			      # teste de Breusch-Pagan
+
+
+```
+
+
+## Erros não-correlacionados
+
+```{r, warning=FALSE, message=FALSE}
+
+bgtest(fit6)			      # teste de Breusch-Godfrey
+
+```
+
+
+
+
+
+
+
+
+
 
 
 

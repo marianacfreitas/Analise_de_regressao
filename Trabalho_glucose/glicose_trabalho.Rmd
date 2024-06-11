@@ -169,6 +169,9 @@ ggplot(df2, aes(x = age_interval, y = glucose, fill = age_interval)) +
 
 ```
 
+No boxplot acima, discretizamos a variável que representa idade, por meio de um agrupamento em intervalos. Observamos que, a medida que a idade aumenta, a média da concentração de glicose também aumenta gradualmente, além de apresentar variabilidade levemente maior.
+
+
 ```{r, message=F, warning=FALSE, echo=FALSE}
 
 # Gráfico de dispersão glucose x bmi
@@ -198,6 +201,9 @@ ggplot(df2, aes(x = preg_interval, y = glucose, fill = preg_interval)) +
 
 ```
 
+Nesse gráfico, as idades gestacionais (em semanas) foram agrupadas em intervalos. A partir do gráfico de violino, é possível notar que nos primeiros grupos a glicose se concentra em níveis mais baixos, já a partir das semanas 6 a 9 o nível de glicose começa a se distribuir mais uniformemente, enquanto no último grupo se concentra em níveis de glicose mais altos.
+
+
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
 # Gráfico de dispersão glucose x diabates_pedigree_function
@@ -224,6 +230,8 @@ ggplot(df, aes(x = glucose, fill = as.factor(outcome))) +
                      labels = c("Saudável", "Diabético"))
 
 ```
+
+Acima temos as curvas de densidade para o nível de glicose, segregado em saudável e diabético. A partir do gráfico de densidade podemos observar que há grande diferença nos níveis de glicose entre os dois grupos, tendo os diabéticos grande concentração nos níveis mais altos e os saudáveis conecentrados em torno de 100.
 
 # Análise de correlação
 

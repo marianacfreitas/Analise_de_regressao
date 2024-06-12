@@ -1,8 +1,9 @@
 ---
 title: "Trabalho de Regressão II"
 author: "Mariana Costa freitas"
-date: "2024-06-06"
+date: '2024-06-06'
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -235,6 +236,13 @@ Acima temos as curvas de densidade para o nível de glicose, segregado em saudá
 
 # Análise de correlação
 
+A correlação descreve como as mudanças em uma variável estão associadas às mudanças em outra variável. A correlação é expressa por um coeficiente de correlação, que varia de -1 a 1. Um coeficiente de correlação próximo de 1 indica uma forte correlação positiva, o que significa que as duas variáveis tendem a aumentar juntas. Um coeficiente de correlação próximo de -1 indica uma forte correlação negativa, onde uma variável tende a diminuir quando a outra aumenta. Um coeficiente de correlação próximo de 0 indica que não há correlação linear entre as variáveis.
+
+A correlação é importante na análise de regressão porque ajuda a entender a relação entre as variáveis independentes e a variável dependente. Antes de construir um modelo de regressão, é crucial examinar a correlação entre as variáveis independentes e a variável dependente. Se houver uma correlação forte entre uma variável independente e a variável dependente, isso sugere que a variável independente pode ser um bom preditor da variável dependente e pode ser incluída no modelo de regressão.
+
+A seguir é possível visualizar a correlação entre as variáveis que estamos trabalhando:
+
+
 ```{r, message=FALSE, warning=FALSE, echo=FALSE}
 
 ggcorr(df, geom = "blank", label = TRUE, hjust = 0.75) +
@@ -243,6 +251,8 @@ ggcorr(df, geom = "blank", label = TRUE, hjust = 0.75) +
   guides(color = FALSE, alpha = FALSE)
 
 ```
+
+Pode-se obervar que, em geral, as correlações entre as variáveis são baixas e todas positivas, sendo as mais correlacionadas oa pares *outcome* e *glucose*, *age* e *pregnancies* e o restante com medidas entre 0 e 0.3. Como nenhuma correlação, é, em módulo, maior que 0.9, não precisamos remover nenhuma covariável.
 
 # Análise de Regressão
 
@@ -260,6 +270,16 @@ summary(opt_model_step_aic)
 
 
 ```
+
+Um modelo de regressão linear visa descrever a relação entre uma variável dependente (também chamada de variável de resposta) e uma ou mais variáveis independentes (também conhecidas como preditoras ou explicativas). Para selecionar o modelo que melhor se ajusta aos dados, vamos usar como base o Critério de Informação de Akaike (AIC), que é uma medida que apresenta menor valor para o melhor modelo. Logo, nosso objetivo é encontrar o modelo que apresenta o menor AIC.
+
+Para isso, vamos utilizar o método de seleção de variáveis chamado *Stepwise*, que começa com o modelo completo, ou seja, com todas as variáveis no modelo e remove ou adiciona as variáveis caso uma dessas opções gere uma diminuição no AIC. Quando nenhuma dessas ações ocasiona um menor AIC, consideramos que o melhor modelo foi obtido. 
+
+Em R, executamos esse processo primeiro utilizando a função `lm()`, que ajusta o modelo aos dados, estimando os coeficientes que melhor ajustam os dados observados. Em seguida, usamos a função,  `stepAIC()`, com argumento `direction="both"`, que funciona seguindo um procedimento iterativo que envolve adicionar ou remover variáveis independentes do modelo, uma de cada vez, e comparar os valores do AIC para determinar se a adição ou remoção da variável resulta em uma melhoria no ajuste do modelo. O processo continua até que nenhuma alteração adicional resulte em uma redução significativa no AIC.
+
+Ao executar esse processo aplicado aos dados do Instituto Nacional de Diabetes e Doenças Digestivas e Renais, obtemos que as variáveis presentes no modelo para descrever a variável *glucose* são *pregnancies*, *bllod_pressure*, *bmi*, *age* e *outcome*, com coeficientes -0.69186, 0.23415, 0.29128, 0.44003 e 27.73519, respectivamente.
+
+
 ## Verificando pressupostos do modelo
 
 #### Pontos influentes e de alavanca

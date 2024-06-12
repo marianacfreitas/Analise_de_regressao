@@ -282,7 +282,25 @@ Ao executar esse processo aplicado aos dados do Instituto Nacional de Diabetes e
 
 ## Verificando pressupostos do modelo
 
-#### Pontos influentes e de alavanca
+Os pressupostos de um modelo de regressão são condições que devem ser atendidas para garantir a validade e a confiabilidade das inferências e previsões feitas pelo modelo. Esses pressupostos são fundamentais para assegurar que as estimativas dos coeficientes do modelo sejam precisas e que os testes estatísticos sejam válidos. Aqui vamos verificar os pontos influentes e de alavanca, a normalidade dos erros e a homocedasticidade. Garantir que esses pressupostos sejam atendidos é essencial para a construção de modelos de regressão robustos e confiáveis, que possam ser usados para tomar decisões informadas e baseadas em dados.
+
+## Multicolinearidade
+
+O pressuposto da multicolinearidade refere-se à situação em que duas ou mais variáveis independentes em um modelo de regressão estão altamente correlacionadas entre si. Em outras palavras, existe uma relação linear quase perfeita entre algumas das variáveis independentes. Esse fenômeno pode ser prejudicial para a interpretação do modelo e para a precisão das estimativas dos coeficientes de regressão. Quando existe multicolinearidade, torna-se difícil interpretar os efeitos individuais de cada variável independente sobre a variável dependente.
+
+Já vimos pelo gráfico de correlação, que não há nenhum par de variáveis altamente correlacionadas, agora vamos verificar, usando a VIF, uma métrica que quantifica o grau de multicolinearidade entre as variáveis independentes. Valores de VIF maiores que 10 são frequentemente considerados indicativos de multicolinearidade significativa. Usando a função `vif()`, do R, observamos que os valores variam de 1.187740 a 1.591839, logo não há multicolinearidade.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+vif(opt_model_step_aic)
+
+```
+
+
+#### Identificação de Outliers
+
+Valores discrepantes presentes nos dados podem interferir na correta estimação do modelo, assim, é necessário removê-los. Para identificar esses pontos atípicos, utilizamos os resíduos estudentizados, que são uma medida padronizada dos resíduos de um modelo estatístico calculada dividindo o resíduo pelo seu desvio padrão estimado. Essa padronização permite que os resíduos sejam comparados entre si e com valores de referência, facilitando a identificação de observações incomuns ou atípicas no conjunto de dados. Aqui vamos definir os "limites" para esses resíduos estudentizados como 2 e -2, retirando os dados com resíduos fora do intervalo $[-2, 2]$. A seguir representamos esses resíduos graficamente.
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
@@ -313,6 +331,8 @@ df.fit %>% ggplot(aes(x=obs,y=rst)) +
   theme_bw()
 
 ```
+
+Aqui identificamos as observações discrepantes e vamos retirá-las, reconstruindo o modelo e agora obtendo o seguinte gráfico de resíduos estudentizados:
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
 
@@ -360,6 +380,8 @@ df.fit2 %>% ggplot(aes(x=obs2,y=rst2)) +
 
 ```
 
+É possível notar que ainda há a presença de alguns *outliers*, assim, vamos executar o processo de remover as observações e construir o modelo novamente, obtendo:
+
 ```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
 
 #Retirando os dados discrepantes
@@ -406,6 +428,14 @@ df.fit3 %>% ggplot(aes(x=obs3,y=rst3)) +
 
 ```
 
+Acima podemos notar que há poucos outliers e que esses estão localizados bem próximos aos "limites" que adotamos. Assim, podemos seguir verificando os demais pressupostos do modelo.
+
+## Pontos de alavanca
+
+Pontos de alavanca são observações que possuem valores extremos nas variáveis independentes (preditoras). Esses pontos têm o potencial de influenciar significativamente a posição da linha de regressão, devido à sua distância em relação à média das variáveis independentes.
+
+Para identificar os pontos de alavanca vamos analisar se o valor de alavanca (calculado a partir da matriz H) de cada observação excede $\frac{2k+1}{n}$, em que $k$ é o número de covariáveis e $n$ o número de observações. 
+
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 # GRÁFICO - ALAVANCAGEM
 
@@ -418,6 +448,8 @@ df.fit3 %>% ggplot(aes(x=obs3,y=hii3,ymin=0,ymax=hii3)) +
   theme_bw()
 
 ```
+
+Aqui percebemos que muitas observações ultrapassam o valor limite estipulado, assim removemos esses dados e reconstruímos o modelo, obtendo:
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
 
@@ -468,6 +500,8 @@ df.fit4 %>% ggplot(aes(x=obs4,y=hii4,ymin=0,ymax=hii4)) +
 
 ```
 
+Como ainda há valores que ultrpassam o valor de corte, vamos executar esse processo novamente:
+
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
 
@@ -517,6 +551,14 @@ df.fit5 %>% ggplot(aes(x=obs5,y=hii5,ymin=0, ymax=hii5)) +
 
 
 ```
+
+Aqui há menos observações acima do valor de corte e que ultrapassam esse limite em menor valor. Assim, vamos seguir para os demais pressupostos.
+
+## Pontos influentes
+
+Pontos influentes são observações que têm um impacto significativo nos parâmetros estimados do modelo, podendo distorcer os resultados da regressão e levar a conclusões incorretas sobre a relação entre as variáveis. Identificar e avaliar a influência desses pontos ajuda a garantir a robustez do modelo e a confiabilidade das inferências feitas a partir dele.
+
+Uma métrica comum para identificar pontos influentes é a distância de Cook.
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 

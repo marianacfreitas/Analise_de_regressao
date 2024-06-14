@@ -558,7 +558,7 @@ Aqui há menos observações acima do valor de corte e que ultrapassam esse limi
 
 Pontos influentes são observações que têm um impacto significativo nos parâmetros estimados do modelo, podendo distorcer os resultados da regressão e levar a conclusões incorretas sobre a relação entre as variáveis. Identificar e avaliar a influência desses pontos ajuda a garantir a robustez do modelo e a confiabilidade das inferências feitas a partir dele.
 
-Uma métrica comum para identificar pontos influentes é a distância de Cook.
+Uma métrica comum para identificar pontos influentes é a distância de Cook, que combina tanto a magnitude do resíduo quanto a alavanca de uma observação para determinar sua influência no ajuste do modelo. Valores próximos de 0 indicam que a observação não é influente, maiores que 1 sugerem que a observação pode ser influente e entre 0 e 1 indicam que a observação pode ter alguma influência, mas não é necessariamente preocupante. A seguir estão essas distâncias representadas graficamente:
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
@@ -574,57 +574,41 @@ df.fit5 %>% ggplot(aes(x=obs5,y=dcook5,ymin=0,ymax=dcook5)) +
 
 ```
 
-
-```{r, message=FALSE, warning=FALSE, echo=FALSE}
-
-# GRÁFICO GERAL DE DIAGNÓSTICO
-
-texto<- paste("observ:",obs5,"\n",
-              "resid_stud:",round(rst5,2),"\n",
-              "alavancagem:",round(hii5,2),"\n",
-              "D_Cook:",round(dcook5,2),"\n",
-              "corte_Cook:",round(corte.cook5,2))
-
-ggplotly(
-  
-  df.fit5 %>% ggplot(aes(x=hii5,y=rst5,text=texto)) +
-    geom_point(aes(size=dcook5)) + 
-    xlim(0, max(max(hii5),corte.hii5)) + 
-    ylim(-max(abs(rst5),corte.stu5), max(abs(rst5),corte.stu5)) + 
-    geom_hline(yintercept = c(-corte.stu5, corte.stu5), color="red", linetype="dashed") + 
-    geom_vline(xintercept = corte.hii5, color="red", linetype="dashed") + 
-    theme_bw() +
-    theme(legend.position="none") + 
-    xlab("Alavancagem") + 
-    ylab("Resíduo Estudentizado"),
-  tooltip = c("text")
-  
-)
-
-```
+Como nenhuma observação ultrapassa o ponto de corte estipulado, não precisamos fazer nenhuma alteração no modelo vigente.
 
 ## Normalidade
+
+O pressuposto da normalidade requer que os erros do modelo sejam distribuídos de forma aproximadamente normal. Este pressuposto é crucial, especialmente quando se deseja realizar testes de hipóteses e construir intervalos de confiança para os coeficientes de regressão.
+
+Um dos procedimentos para avaliar se os residuos são normalmente distribuídos é o teste Lilliefors (Kolmogorov-Smirnov), que é usado para verificar se uma amostra de dados segue uma distribuição normal.
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
 # TESTE DE NORMALIDADE
 
-t1 <- ks.test(rst5,"pnorm")	#KS
+#t1 <- ks.test(rst5,"pnorm")	#KS
 t2 <- lillie.test(rst5)		  # Lilliefors
-t3 <- cvm.test(rst5)		      # Cramér-von Mises
-t4 <- shapiro.test(rst5)		  # Shapiro-Wilk
-t5 <- sf.test(rst5)		      # Shapiro-Francia
-t6 <- ad.test(rst5)		      # Anderson-Darling
+#t3 <- cvm.test(rst5)		      # Cramér-von Mises
+#t4 <- shapiro.test(rst5)		  # Shapiro-Wilk
+#t5 <- sf.test(rst5)		      # Shapiro-Francia
+#t6 <- ad.test(rst5)		      # Anderson-Darling
 
 # Tabela de resultados
-testes <- c(t1$method, t2$method, t3$method, t4$method, t5$method,t6$method)
-estt <- as.numeric(c(t1$statistic,
-                     t2$statistic,
-                     t3$statistic,
-                     t4$statistic,
-                     t5$statistic,
-                     t6$statistic))
-valorp <- c(t1$p.value, t2$p.value, t3$p.value, t4$p.value, t5$p.value,t6$p.value)
+testes <- c(#t1$method, 
+  t2$method
+  #, t3$method, t4$method, t5$method,t6$method
+  )
+estt <- as.numeric(c(#t1$statistic,
+                     t2$statistic #,
+                     #t3$statistic,
+                     #t4$statistic,
+                     #t5$statistic,
+                     #t6$statistic
+                     ))
+valorp <- c(#t1$p.value, 
+  t2$p.value
+  #, t3$p.value, t4$p.value, t5$p.value,t6$p.value
+  )
 resultados <- cbind(estt, valorp)
 rownames(resultados) <- testes
 colnames(resultados) <- c("Estatística", "p")
@@ -633,6 +617,8 @@ round(resultados, digits = 4)
 
 
 ```
+
+Considerando um nível de significância de 0.05, rejeitamos a hipótese de normalidade dos resíduos, já que o valor-p é 0.0346, menor que 0.05. Para cumprir o pressuposto e obter resíduos normalmente distribuídos, vamos usar a transformação de Box-Cox, que é uma técnica utilizada para transformar dados não normais em uma forma que siga uma distribuição aproximadamente normal, sendo útil na modelagem estatística e na análise de regressão para garantir a normalidade dos resíduos. 
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 

@@ -129,6 +129,7 @@ ggplot(data = df, aes(x = glucose, y = blood_pressure)) +
 
 ```
 
+É possível perceber que o comportamento da variável *glucose* não é influenciado pela variável *blood_pressure* e vice-versa, já que não observamos nenhum padrão na distribuição de uma conforme aumento ou diminuição da outra.
 
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
@@ -183,6 +184,8 @@ ggplot(data = df, aes(x = glucose, y = bmi)) +
 
 ```
 
+Na representação acima, podemos observar que não há uma tendência a aumento ou diminuição de uma das variáveis enquanto a outra aumenta, o IMC se mantém distribuído da mesma forma conforme a variação da concentração de glicose.
+
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
 # Gráfico de violino glucose por número de gestações discretizada
@@ -214,6 +217,8 @@ ggplot(data = df, aes(x = glucose, y = diabetes_pedigree_function)) +
   labs(x = "Concentração de glicose", y = "Diabetes função da genealogia", title = " ")  + theme_minimal()
 
 ```
+
+Aqui podemos notar que aparentemente não há uma linha reta ou curva que descreva a relação entre as variáveis. Os pontos não seguem uma inclinação positiva (indicando correlação positiva) ou negativa (indicando correlação negativa).
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
@@ -618,7 +623,7 @@ round(resultados, digits = 4)
 
 ```
 
-Considerando um nível de significância de 0.05, rejeitamos a hipótese de normalidade dos resíduos, já que o valor-p é 0.0346, menor que 0.05. Para cumprir o pressuposto e obter resíduos normalmente distribuídos, vamos usar a transformação de Box-Cox, que é uma técnica utilizada para transformar dados não normais em uma forma que siga uma distribuição aproximadamente normal, sendo útil na modelagem estatística e na análise de regressão para garantir a normalidade dos resíduos. 
+Considerando um nível de significância de 0.05, rejeitamos a hipótese de normalidade dos resíduos, já que o valor-p é 0.0346, menor que 0.05. Para cumprir o pressuposto e obter resíduos normalmente distribuídos, vamos usar a transformação de Box-Cox, que é uma técnica utilizada para transformar dados não normais em uma forma que siga uma distribuição aproximadamente normal, sendo útil na modelagem estatística e na análise de regressão para garantir a normalidade dos resíduos. Vamos escolher o valor de $\lambda$ para a transformação de forma que maximize a função de verossimilhança, mostrada graficamente abaixo:
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
@@ -628,6 +633,9 @@ transf_boxcox <- fit5 %>% boxcox(data=df)
 lambda<- transf_boxcox$x[which.max(transf_boxcox$y)]
 
 ```
+
+Assim, aplicamos a transformação para um $\lambda=0.1414141$ e realizamos o teste novamente, obtendo:
+
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 df <- df |>
   mutate(glucose_bc = (glucose^lambda - 1)/lambda) |>
@@ -654,22 +662,29 @@ summary(opt_model_step_aic6)
 fit6 <- opt_model_step_aic6
 rst6<- rstudent(fit6)		      # resíduos estudentizados
 
-t1 <- ks.test(rst6,"pnorm")	#KS
+#t1 <- ks.test(rst5,"pnorm")	#KS
 t2 <- lillie.test(rst6)		  # Lilliefors
-t3 <- cvm.test(rst6)		      # Cramér-von Mises
-t4 <- shapiro.test(rst6)		  # Shapiro-Wilk
-t5 <- sf.test(rst6)		      # Shapiro-Francia
-t6 <- ad.test(rst6)		      # Anderson-Darling
+#t3 <- cvm.test(rst5)		      # Cramér-von Mises
+#t4 <- shapiro.test(rst5)		  # Shapiro-Wilk
+#t5 <- sf.test(rst5)		      # Shapiro-Francia
+#t6 <- ad.test(rst5)		      # Anderson-Darling
 
 # Tabela de resultados
-testes <- c(t1$method, t2$method, t3$method, t4$method, t5$method,t6$method)
-estt <- as.numeric(c(t1$statistic,
-                     t2$statistic,
-                     t3$statistic,
-                     t4$statistic,
-                     t5$statistic,
-                     t6$statistic))
-valorp <- c(t1$p.value, t2$p.value, t3$p.value, t4$p.value, t5$p.value,t6$p.value)
+testes <- c(#t1$method, 
+  t2$method
+  #, t3$method, t4$method, t5$method,t6$method
+  )
+estt <- as.numeric(c(#t1$statistic,
+                     t2$statistic #,
+                     #t3$statistic,
+                     #t4$statistic,
+                     #t5$statistic,
+                     #t6$statistic
+                     ))
+valorp <- c(#t1$p.value, 
+  t2$p.value
+  #, t3$p.value, t4$p.value, t5$p.value,t6$p.value
+  )
 resultados <- cbind(estt, valorp)
 rownames(resultados) <- testes
 colnames(resultados) <- c("Estatística", "p")
@@ -677,7 +692,13 @@ round(resultados, digits = 4)
 
 ```
 
+Aqui obtemos um p-valor maior que 0.05, assim aceitamos a hipótese de que os resíduos são normalmente distribuídos.
+
 ## Homoscedasticidade
+
+A homocedasticidade ocorre quando a variância dos erros (ou resíduos) é constante ao longo de todos os níveis das variáveis independentes. Quando esse pressuposto é satisfeito, dizemos que os erros são homocedásticos. Caso contrário, quando a variância dos erros varia, temos heterocedasticidade. A presença de heterocedasticidade pode levar a estimativas de coeficientes com variâncias subestimadas ou superestimadas, resultando em testes de significância e intervalos de confiança incorretos.
+
+Para verificar a homocedasticidade, uma das ferramentas utilizadas é o Teste de Breusch-Pagan, que avalia a hipótese nula de que os erros têm variância constante. Um valor de p pequeno (tipicamente menor que 0,05) indica a presença de heterocedasticidade. Realizando esse teste em R obtemos o resultado:
 
 ```{r, warning=FALSE, message=FALSE}
 
@@ -686,14 +707,25 @@ bptest(fit6)			      # teste de Breusch-Pagan
 
 ```
 
+Assim, aceitamos a hipótese nula de homocedasticidade.
+
 
 ## Erros não-correlacionados
+
+O pressuposto de erros não-correlacionados significa que os resíduos (ou erros) do modelo devem ser independentes uns dos outros. Ou seja, o erro associado a uma observação não deve fornecer qualquer informação sobre o erro associado a outra observação. 
+
+Para verificar a independência dos erros em um modelo de regressão, vamos usar o teste de Breusch-Godfrey, que examina a hipótese nula de que não há autocorrelação nos resíduos. A hipótese alternativa é que existe autocorrelação entre eles.
 
 ```{r, warning=FALSE, message=FALSE}
 
 bgtest(fit6)			      # teste de Breusch-Godfrey
 
 ```
+Nesse caso, como obtemos um p-valor maior que o nível de significância 0.05, aceitamos a hipótese de erros não correlacionados.
+
+## Conclusão
+
+Neste trabalho, abordamos a construção de um modelo de regressão para a variável glucose em um conjunto de dados coletados pelo Instituto Nacional de Diabetes e Doenças Digestivas e Renais. O estudo envolveu diversas variáveis preditoras como *pregnancies*, *bloodPressure*, *skinThickness*, *insulin*, *bmi*, *diabetesPedigreeFunction*, *ag*e e *outcome*. Através dessa análise, destacamos a importância de verificar e satisfazer os pressupostos fundamentais da regressão linear para garantir a validade e a precisão das inferências estatísticas.
 
 
 

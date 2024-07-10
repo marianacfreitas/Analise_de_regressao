@@ -2,7 +2,7 @@
 
 library(tidyverse)	# manipulacao de dados
 library(tidymodels) # ferramentas de ML
-library(extrasteps) # complemento para pre-processamento dos dados
+#library(extrasteps) # complemento para pre-processamento dos dados
 library(plsmod)     # necessario para usar modelo pls
 library(tictoc)     # registrar o tempo de execução de comandos
 library(janitor)    # limpeza de dados
@@ -14,7 +14,7 @@ library(readxl)
 
 ##### CARREGANDO/LIMPANDO OS DADOS #####
 
-df<- read.csv("C:/Users/lcex/Downloads/dados_trab3 _.csv") |> 
+df<- read.csv("~/Analise_de_regressao_mariana/Trabalho_predicao/dados_trab3.csv") |> 
   data.frame()
 
 df$charges  <- as.numeric(df$charges)
@@ -52,7 +52,7 @@ receita<- recipe(charges ~ . , data = df_train) |>
   #step_unknown(all_nominal_predictors()) |>                 # transformar NA em unknown
   step_normalize(all_numeric_predictors()) |>                # padronizar variaveis
   #step_robust(all_numeric_predictors()) |>                  # padronizacao robusta
-  #step_other(all_nominal_predictors(),threshold=0.05) |>    # cria a categoria "outros"
+  step_other(all_nominal_predictors(),threshold=0.05) |>    # cria a categoria "outros"
   step_dummy(all_nominal_predictors())                        # variaveis dummy
 
 
@@ -184,8 +184,8 @@ show_best(tune_net, metric="mae", n=3)
 ##### AJUSTANDO OS MODELOS TUNADOS AOS DADOS TREINO #####
 
 wf_pls_trained<- wf_pls |> finalize_workflow(select_best(tune_pls,metric="mae")) |> fit(df_train)
-wf_las_trained<- wf_las |> finalize_workflow(select_best(tune_net,metric="mae")) |> fit(df_train)
-wf_rid_trained<- wf_rid |> finalize_workflow(select_best(tune_net,metric="mae")) |> fit(df_train)
+wf_las_trained<- wf_las |> finalize_workflow(select_best(tune_las,metric="mae")) |> fit(df_train)
+wf_rid_trained<- wf_rid |> finalize_workflow(select_best(tune_rid,metric="mae")) |> fit(df_train)
 wf_net_trained<- wf_net |> finalize_workflow(select_best(tune_net,metric="mae")) |> fit(df_train)
 
 
@@ -206,7 +206,7 @@ df_pred<- cbind.data.frame(df_test$charges,
                            pred_rid,
                            pred_net)
 
-colnames(df_pred)<- c("quality",
+colnames(df_pred)<- c("charges",
                       "pls",
                       "las",
                       "rid",
@@ -222,10 +222,10 @@ df_pred |> head()    # VISUALIZANDO PROBABILIDADES
 # MEDIDAS
 
 medidas<- rbind(
-  df_pred |> metrics(quality,pls) |> dplyr::select(.estimate) |> t(),
-  df_pred |> metrics(quality,las) |> dplyr::select(.estimate) |> t(),
-  df_pred |> metrics(quality,rid) |> dplyr::select(.estimate) |> t(),
-  df_pred |> metrics(quality,net) |> dplyr::select(.estimate) |> t()
+  df_pred |> metrics(charges,pls) |> dplyr::select(.estimate) |> t(),
+  df_pred |> metrics(charges,las) |> dplyr::select(.estimate) |> t(),
+  df_pred |> metrics(charges,rid) |> dplyr::select(.estimate) |> t(),
+  df_pred |> metrics(charges,net) |> dplyr::select(.estimate) |> t()
 )
 
 colnames(medidas)<- c("rmse","rsq","mae")
@@ -239,27 +239,9 @@ medidas
 
 ##### FINALIZATION #####
 
-final_wf<- fit(wf_pls_trained, df)    # escolha o melhor modelo
+final_wf<- fit(wf_net_trained, df)    # escolha o melhor modelo
 
 
 # SAVE THE MODEL/WORKFLOW
 saveRDS(final_wf,"modelo_final.rds")
 
-
-# READING THE MODEL/WORKFLOW
-model<- readRDS("modelo_final.rds")
-
-
-
-##### MODEL COEFFICIENTS - OPTIONAL #####
-
-# se o modelo final é PLS
-final_wf |> 
-  tidy() |> 
-  filter(component==select_best(tune_pls,metric="mae")$num_comp) |> 
-  dplyr::select(term, value)
-
-# se o modelo final é LASSO/RIDGE/ELASTIC-NET
-final_wf |> 
-  tidy() |> 
-  dplyr::select(term, estimate)

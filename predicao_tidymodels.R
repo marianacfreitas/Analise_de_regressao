@@ -52,7 +52,7 @@ receita<- recipe(charges ~ . , data = df_train) |>
   #step_unknown(all_nominal_predictors()) |>                 # transformar NA em unknown
   step_normalize(all_numeric_predictors()) |>                # padronizar variaveis
   #step_robust(all_numeric_predictors()) |>                  # padronizacao robusta
-  step_other(all_nominal_predictors(),threshold=0.05) |>    # cria a categoria "outros"
+  #step_other(all_nominal_predictors(),threshold=0.05) |>    # cria a categoria "outros"
   step_dummy(all_nominal_predictors())                        # variaveis dummy
 
 
@@ -239,7 +239,7 @@ medidas
 
 ##### FINALIZATION #####
 
-final_wf<- fit(wf_net_trained, df)    # escolha o melhor modelo
+final_wf<- fit(wf_pls_trained, df)    # escolha o melhor modelo
 
 
 # SAVE THE MODEL/WORKFLOW
